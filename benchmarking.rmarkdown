@@ -1,0 +1,106 @@
+---
+title: "mlr3 Benchmarking"
+format:
+  html:
+    code-fold: true
+---
+
+
+This notebook runs benchmarks on three different datasets `GOQ`, `PI`, `GOPI` using the **mlr3** packages.
+
+
+```{r}
+#| label: load-packages
+#| echo: false
+
+library(ggplot2)
+library(scales)
+
+library(mlr3)
+library(mlr3learners)
+library(mlr3extralearners)
+library(mlr3viz)
+library(mlr3pipelines)
+library(glue)
+```
+
+
+We first set the seed to allow reproducibility of the code.
+
+
+```{r}
+#| label: set-seed
+set.seed(123)
+```
+
+
+We can set the different learner models:
+
+
+```{r}
+#| label: list-learners
+learners = list(lrn("regr.featureless"),
+                lrn("regr.lm"),
+                lrn("regr.ranger"),
+                lrn("regr.km", nugget.stability = 1e-8, covtype = "powexp"),
+                lrn("regr.ksvm"),
+                lrn("regr.rpart"))
+```
+
+
+Wrap each learner in a one-hot encoder for categorical features (gas)
+
+
+```{r}
+#| label: encode-categorical
+learners = lapply(learners, function(l) po("encode") %>>% po("learner", l))
+
+```
+
+
+Load the data and remove meta-data columns
+
+
+```{r}
+#| label: create-tasks
+d.goq = subset(read.csv("GOQ.csv", stringsAsFactors = TRUE), select = -c(campaign, initial))
+task.goq = TaskRegr$new(id = "GOQ", backend = d.goq, target = "target")
+
+d.gopi = subset(read.csv("GOPI.csv", stringsAsFactors = TRUE), select = -c(campaign, initial))
+task.gopi = TaskRegr$new(id = "GOPI", backend = d.gopi, target = "target")
+
+d.pi = subset(read.csv("PI.csv", stringsAsFactors = TRUE), select = -c(campaign, initial))
+task.pi = TaskRegr$new(id = "PI", backend = d.pi, target = "target")
+```
+
+
+Run each learner on each task, with a 10-fold CV
+
+
+```{r}
+#| label: benchmark-design
+#| results: hide
+#| warning: false
+
+design = benchmark_grid(
+    tasks = list(task.goq, task.pi, task.gopi),
+    learners = learners,
+    resamplings = rsmp("cv", folds = 10)
+)
+bmr = benchmark(design)
+```
+
+```{r}
+#| label: scatterplot
+p = autoplot(bmr, measure = msr("regr.mae")) +
+    theme(text = element_text(size=15), axis.text.x = element_text(angle = 55, hjust = 1)) +
+    expand_limits(y = 0)
+    geom_hline(data = data.frame(mean = c(0.394208, 0.550969, 0.370176), task_id = bmr$tasks$task_id),
+               aes(yintercept = mean))
+p
+# ggplot(mpg, aes(x = hwy, y = cty, color = cyl)) +
+#   geom_point(alpha = 0.5, size = 2) +
+#   scale_color_viridis_c() +
+#   theme_minimal()
+```
+
