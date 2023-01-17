@@ -22,6 +22,8 @@ library(mlr3pipelines)
 library(glue)
 ```
 
+![mlr3 building blocks](ml_abstraction.svg){#fig-resample}
+
 We first set the seed to allow reproducibility of the code.
 
 ```{r}
@@ -46,13 +48,14 @@ Wrap each learner in a one-hot encoder for categorical features (gas)
 ```{r}
 #| label: encode-categorical
 learners = lapply(learners, function(l) po("encode") %>>% po("learner", l))
-
 ```
 
 Load the data and remove meta-data columns
 
 ```{r}
 #| label: create-tasks
+
+setwd("..")
 d.goq = subset(read.csv("GOQ.csv", stringsAsFactors = TRUE), select = -c(campaign, initial))
 task.goq = TaskRegr$new(id = "GOQ", backend = d.goq, target = "target")
 
@@ -83,11 +86,9 @@ bmr = benchmark(design)
 p = autoplot(bmr, measure = msr("regr.mae")) +
     theme(text = element_text(size=15), axis.text.x = element_text(angle = 55, hjust = 1)) +
     expand_limits(y = 0)
-    geom_hline(data = data.frame(mean = c(0.394208, 0.550969, 0.370176), task_id = bmr$tasks$task_id),
-               aes(yintercept = mean))
+    # geom_hline(data = data.frame(mean = c(0.394208, 0.550969, 0.370176), task_id = bmr$tasks$task_id),
+    #            aes(yintercept = mean))
 p
-# ggplot(mpg, aes(x = hwy, y = cty, color = cyl)) +
-#   geom_point(alpha = 0.5, size = 2) +
-#   scale_color_viridis_c() +
-#   theme_minimal()
 ```
+
+
